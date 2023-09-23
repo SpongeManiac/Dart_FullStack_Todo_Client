@@ -68,6 +68,8 @@ class _MyHomePageState extends CRUDState<Todo> {
     return await TodoAPI.getTodos(context);
   }
 
+  final GlobalKey formKey = GlobalKey<FormState>();
+
   Widget get todoForm => Form(
         key: formKey,
         child: Padding(
@@ -103,7 +105,7 @@ class _MyHomePageState extends CRUDState<Todo> {
           ),
         ),
       );
-  final GlobalKey formKey = GlobalKey<FormState>();
+
   @override
   void initState() {
     super.initState();
