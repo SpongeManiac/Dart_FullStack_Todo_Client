@@ -64,6 +64,8 @@ class _MyHomePageState extends CRUDState<Todo> {
   TextEditingController descriptionField = TextEditingController();
   bool completed = false;
 
+  List<Todo> localTodos = [];
+
   Future<List<Todo>> getTodos() async {
     return await TodoAPI.getTodos(context);
   }
@@ -109,9 +111,13 @@ class _MyHomePageState extends CRUDState<Todo> {
   @override
   void initState() {
     super.initState();
+    () async {
+      localTodos = await getTodos();
+    }();
     floatingActionNotifierRight.value = HideableFloatingActionData(
       true,
       () async {
+        //localTodos = await getTodos();
         await setCreate();
       },
       const Icon(
@@ -157,8 +163,7 @@ class _MyHomePageState extends CRUDState<Todo> {
             HideableFloatingAction(
                 floatingActionNotifier:
                     floatingActionNotifierLeft), // This trailing comma makes auto-formatting nicer for build methods.
-            HideableFloatingAction(
-                floatingActionNotifier: floatingActionNotifierRight),
+            HideableFloatingAction(floatingActionNotifier: floatingActionNotifierRight),
           ],
         ),
       ),
@@ -181,7 +186,10 @@ class _MyHomePageState extends CRUDState<Todo> {
       true,
       () async {
         var todo = await create();
-        if (todo.id != -1) await setRead();
+        if (todo.id != -1) {
+          localTodos.add(todo);
+          await setRead();
+        }
       },
       const Icon(
         Icons.send_rounded,
@@ -236,9 +244,12 @@ class _MyHomePageState extends CRUDState<Todo> {
       true,
       () async {
         Todo todo = Todo(titleField.text, descriptionField.text, completed);
-        todo.id = itemToEdit!.id;
-        itemToEdit = todo;
-        await TodoAPI.updateTodo(todo);
+        //todo.id = itemToEdit!.id;
+        //itemToEdit = todo;
+        var idx = localTodos.indexOf(itemToEdit!);
+        localTodos[idx] = todo;
+        //await TodoAPI.updateTodo(todo);
+
         await setRead();
       },
       const Icon(
@@ -256,15 +267,15 @@ class _MyHomePageState extends CRUDState<Todo> {
   Future<Todo> create() async {
     FormState formState = formKey.currentState as FormState;
     if (formState.validate()) {
-      Todo todo =
-          Todo(titleField.text, descriptionField.text, completed, id: -2);
-      if (await TodoAPI.createTodo(todo)) return todo;
+      Todo todo = Todo(titleField.text, descriptionField.text, completed, id: -2);
+      return todo;
     }
     return Todo.empty;
   }
 
   @override
   Future<Todo> update(Todo item) async {
+    localTodos[localTodos.indexOf(item)];
     if (await TodoAPI.updateTodo(item)) {
       return await TodoAPI.readTodo(item.id);
     } else {
@@ -297,90 +308,86 @@ class _MyHomePageState extends CRUDState<Todo> {
       child: Column(
         children: [
           Expanded(
-            child: FutureBuilder<List<Todo>>(
-              future: getTodos(),
-              builder: (context, snapshot) {
-                List<Todo> list = snapshot.data ?? [];
-                return RefreshIndicator(
-                  onRefresh: () async {
-                    setState(() {});
-                  },
-                  child: ScrollConfiguration(
-                    behavior: ScrollConfiguration.of(context).copyWith(
-                      dragDevices: {
-                        PointerDeviceKind.touch,
-                        PointerDeviceKind.mouse,
-                      },
-                    ),
-                    child: ListView.builder(
-                      shrinkWrap: false,
-                      itemCount: list.length,
-                      itemBuilder: ((context, index) {
-                        Todo item = list[index];
-                        return ListTile(
-                          onTap: () async {
-                            var newTodo = item;
-                            newTodo.completed = !newTodo.completed;
-                            await TodoAPI.updateTodo(newTodo);
-                            setState(() {});
-                          },
-                          onLongPress: () async {
-                            await showDialog(
-                                context: context,
-                                builder: (context) {
-                                  return AlertDialog(
-                                    title: const Text('Todo Options'),
-                                    actions: [
-                                      ListTile(
-                                        onTap: () async {
-                                          setUpdate(item);
-                                          Navigator.of(context).pop();
-                                        },
-                                        title: const Text('Edit Todo'),
-                                        trailing: const Icon(
-                                          Icons.edit_rounded,
-                                          color: Colors.green,
-                                        ),
-                                      ),
-                                      ListTile(
-                                        onTap: () async {
-                                          setDelete(item);
-                                          Navigator.of(context).pop();
-                                        },
-                                        leading: const Icon(
-                                          Icons.warning_rounded,
-                                          color: Colors.red,
-                                        ),
-                                        title: const Text(
-                                          'Delete Todo',
-                                          textAlign: TextAlign.center,
-                                        ),
-                                        trailing: const Icon(
-                                          Icons.delete_rounded,
-                                          color: Colors.red,
-                                        ),
-                                      ),
-                                    ],
-                                  );
-                                });
-                          },
-                          title: Text(item.title),
-                          subtitle: Text(item.description),
-                          trailing: Checkbox(
-                            value: item.completed,
-                            onChanged: (value) async {
-                              var newTodo = item;
-                              newTodo.completed = value ?? false;
-                              await update(newTodo);
-                              setState(() {});
-                            },
-                          ),
-                        );
-                      }),
-                    ),
-                  ),
-                );
+            child: RefreshIndicator(
+              onRefresh: () async {
+                setState(() async {
+                  localTodos = await getTodos();
+                });
               },
+              child: ScrollConfiguration(
+                behavior: ScrollConfiguration.of(context).copyWith(
+                  dragDevices: {
+                    PointerDeviceKind.touch,
+                    PointerDeviceKind.mouse,
+                  },
+                ),
+                child: ListView.builder(
+                  shrinkWrap: false,
+                  itemCount: localTodos.length,
+                  itemBuilder: ((context, index) {
+                    Todo item = localTodos[index];
+                    return ListTile(
+                      onTap: () async {
+                        item.completed = !item.completed;
+                        //await TodoAPI.updateTodo(newTodo);
+                        update(item);
+                        setState(() {});
+                      },
+                      onLongPress: () async {
+                        await showDialog(
+                            context: context,
+                            builder: (context) {
+                              return AlertDialog(
+                                title: const Text('Todo Options'),
+                                actions: [
+                                  ListTile(
+                                    onTap: () async {
+                                      setUpdate(item);
+                                      Navigator.of(context).pop();
+                                    },
+                                    title: const Text('Edit Todo'),
+                                    trailing: const Icon(
+                                      Icons.edit_rounded,
+                                      color: Colors.green,
+                                    ),
+                                  ),
+                                  ListTile(
+                                    onTap: () async {
+                                      setDelete(item);
+                                      Navigator.of(context).pop();
+                                    },
+                                    leading: const Icon(
+                                      Icons.warning_rounded,
+                                      color: Colors.red,
+                                    ),
+                                    title: const Text(
+                                      'Delete Todo',
+                                      textAlign: TextAlign.center,
+                                    ),
+                                    trailing: const Icon(
+                                      Icons.delete_rounded,
+                                      color: Colors.red,
+                                    ),
+                                  ),
+                                ],
+                              );
+                            });
+                      },
+                      title: Text(item.title),
+                      subtitle: Text(item.description),
+                      trailing: Checkbox(
+                        value: item.completed,
+                        onChanged: (value) async {
+                          var newTodo = item;
+                          newTodo.completed = value ?? false;
+                          //await update(newTodo);
+                          setState(() {});
+                        },
+                      ),
+                    );
+                  }),
+                ),
+              ),
             ),
           ),
         ],
